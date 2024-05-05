@@ -1,0 +1,26 @@
+; This file is written in the pi pico's PIO ASM 
+; The code is converted from a .pio file to a .pio.h header file by the pico-sdk
+
+.program buzzer_squarewave
+.side_set 1 opt
+
+start:
+    pull noblock    	 		; Pull from FIFO to OSR if available, else copy X to OSR.
+    mov x, 	osr             	; Copy most-recently-pulled value back to scratch X
+	jmp !x,	start
+    mov y, 	isr            		; ISR contains PWM period. Y used as counter
+highloop:		
+	jmp y-- highloop 	side 1
+	mov y, 	isr 		[3] 	; Reset y to value in ISR and delay 2 cycles to keep path length the same
+lowloop:
+	jmp y-- lowloop 	side 0
+
+% c-sdk {
+static inline void pwm_program_init(PIO pio, uint sm, uint offset, uint pin) {
+   pio_gpio_init(pio, pin);
+   pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
+   pio_sm_config c = buzzer_squarewave_program_get_default_config(offset);
+   sm_config_set_sideset_pins(&c, pin);
+   pio_sm_init(pio, sm, offset, &c);
+}
+%}
